@@ -19,7 +19,9 @@
   "author": "Senior Backend Architect",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.20.0",
     "better-sqlite3": "^9.6.0",
+    "cheerio": "^1.2.0",
     "dotenv": "^16.4.5",
     "grammy": "^1.21.1",
     "mailparser": "^3.6.8",

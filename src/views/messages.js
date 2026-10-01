@@ -217,14 +217,14 @@ module.exports = {
 
   helpMessage() {
     return (
-      `❓ <b>PANDUAN BANTUAN TEMP MAIL</b>\n` +
+      `❓ <b>PANDUAN BANTUAN TEMP MAIL & DOWNLOADER</b>\n` +
       `${SEPARATOR}\n` +
-      `<b>Cara Penggunaan:</b>\n` +
+      `<b>Cara Penggunaan Temp Mail:</b>\n` +
       `1️⃣ Tekan <b>➕ Buat Email Baru</b> untuk membuat email random <code>@yaoi.web.id</code>.\n` +
       `2️⃣ Gunakan alamat tersebut untuk mendaftar akun / verifikasi online.\n` +
       `3️⃣ Tekan <b>📥 Inbox</b> atau <b>📡 Live Inbox</b> untuk membaca pesan yang masuk.\n` +
       `4️⃣ Jika ada OTP, bot akan mendeteksi dan menampilkan tombol salin cepat!\n\n` +
-      `<b>Perintah Chat:</b>\n` +
+      `<b>Perintah Chat Temp Mail:</b>\n` +
       `/start - Menampilkan menu utama\n` +
       `/new - Generator email otomatis\n` +
       `/custom - Buat email nama sendiri\n` +
@@ -232,7 +232,13 @@ module.exports = {
       `/live - Mode live streaming 5 detik\n` +
       `/history - Riwayat email\n` +
       `/profile - Profil & statistik user\n` +
+      `/server - Status server, RAM, CPU & sistem\n` +
       `/help - Bantuan ini\n\n` +
+      `<b>Perintah Media Downloader:</b>\n` +
+      `/ig &lt;url&gt; - Downloader Instagram Video (Multi-Server V1/V2/V3)\n` +
+      `/yt &lt;url&gt; - Downloader YouTube Video & Audio (YtUltra)\n` +
+      `/terabox &lt;url&gt; atau /tb &lt;url&gt; - Downloader & Streamer Terabox\n` +
+      `/twitter &lt;url&gt; atau /x &lt;url&gt; - Downloader Video Twitter / X\n\n` +
       `<b>Domain Resmi:</b> <code>@yaoi.web.id</code>`
     );
   },

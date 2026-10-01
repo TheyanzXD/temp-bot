@@ -13,11 +13,17 @@ const adminHandler = require('./admin.handler');
 const forceJoinService = require('../services/force-join');
 const messagesViews = require('../views/messages');
 
+const downloaderHandler = require('./downloader.handler');
+
 module.exports = async function callbackQueryHandler(ctx) {
   const data = ctx.callbackQuery.data;
 
   if (data === 'noop') {
     return ctx.answerCallbackQuery();
+  }
+
+  if (data.startsWith('ig_')) {
+    return downloaderHandler.handleInstagramCallback(ctx);
   }
 
   const parts = data.split(':');

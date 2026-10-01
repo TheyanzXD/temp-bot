@@ -1,6 +1,52 @@
-# 📧 BOT TELEGRAM TEMP MAIL `@yaoi.web.id`
+# 📧 BOT TELEGRAM TEMP MAIL `@yaoi.web.id` & MEDIA DOWNLOADER SUITE
 
-Bot Telegram Email Sementara (Temp Mail) berarsitektur modular yang dibangun menggunakan **Node.js**, **grammY framework**, dan **SQLite** (`better-sqlite3` dengan WAL mode enabled). Semua email yang digenerate **WAJIB berakhiran `@yaoi.web.id`**.
+Bot Telegram Email Sementara (Temp Mail) dan Media Downloader berarsitektur modular yang dibangun menggunakan **Node.js**, **grammY framework**, dan **SQLite** (`better-sqlite3` dengan WAL mode enabled). Semua email yang digenerate **WAJIB berakhiran `@yaoi.web.id`**.
+
+---
+
+## 🌟 FITUR UTAMA BOT
+
+### 1. 📧 Temp Mail Service (`@yaoi.web.id`)
+- **Random Email Generator**: Buat email acak sekali klik.
+- **Custom Email Generator**: Buat email dengan nama pilihan sendiri (`nama@yaoi.web.id`).
+- **Live Inbox Streaming**: Pemantauan pesan masuk secara realtime (auto refresh tiap 5 detik).
+- **OTP Auto Detector**: Deteksi otomatis kode verifikasi / OTP dengan tombol salin instan.
+- **Manajemen Email & Inbox**: Riwayat email, baca isi pesan, dan hapus email.
+
+### 2. 📥 Multi-Platform Media Downloader
+- **🔴 YouTube Downloader (`/yt`)**: Mendukung pengunduhan video & audio (MP3/M4A/MP4) resolusi HD melalui API YtUltra.
+- **📦 Terabox Downloader (`/terabox` & `/tb`)**:
+  - `/terabox`: Ekstraksi direct download link HD & stream video langsung menggunakan MD5 Token Generator API PlayTerabox.
+  - `/tb`: Downloader & Streamer Terabox alternatif menggunakan Teraplayer API.
+- **📸 Instagram Downloader (`/ig`)**: Mendukung unduh video Reel/Post dengan sistem selector Multi-Server (Server V1, V2, & V3).
+- **🐤 Twitter / X Downloader (`/twitter` / `/x`)**: Extract & direct download video postingan X/Twitter.
+
+### 3. 🖥 System & Server Monitoring (`/server`)
+- Pemantauan metrik server lengkap: Memory (RAM System & Process), System Uptime, Process Uptime, OS Name, Hostname, CPU Cores, Load Average, Log Storage, Database Size, dan Active Poller Sessions.
+
+---
+
+## 📋 DAFTAR PERINTAH BOT
+
+| Perintah | Kategori | Deskripsi |
+| :--- | :--- | :--- |
+| `/start` | Utama | Menampilkan pesan selamat datang & menu utama |
+| `/menu` | Utama | Buka menu navigasi utama |
+| `/new` | Temp Mail | Buat email sementara acak `@yaoi.web.id` |
+| `/custom` | Temp Mail | Buat email custom sesuai keinginan |
+| `/inbox` | Temp Mail | Buka pesan masuk email aktif |
+| `/live` | Temp Mail | Mode live streaming inbox 5 detik |
+| `/history` | Temp Mail | Riwayat daftar email sementara |
+| `/profile` | User | Detail statistik & profil pengguna |
+| `/yt <url>` | Downloader | Download Video & Audio YouTube (YtUltra) |
+| `/terabox <url>` | Downloader | Download & Stream Terabox (PlayTerabox API) |
+| `/tb <url>` | Downloader | Download & Stream Terabox (Teraplayer API) |
+| `/ig <url>` | Downloader | Download Video Instagram (Multi-Server V1/V2/V3) |
+| `/twitter <url>` | Downloader | Download Video Twitter / X |
+| `/x <url>` | Downloader | Alias untuk downloader Twitter |
+| `/server` | System | Cek RAM, Memory, CPU, OS, Logs & Task Status |
+| `/help` | Bantuan | Panduan lengkap penggunaan bot |
+| `/admin` | Admin | Dashboard manajemen bot untuk Admin & Owner |
 
 ---
 
@@ -16,7 +62,7 @@ Bot Telegram Email Sementara (Temp Mail) berarsitektur modular yang dibangun men
 
 1. Clone repository atau salin folder proyek ini:
    ```bash
-   cd tempmail-bot
+   cd temp-bot
    ```
 
 2. Install dependency:
@@ -49,33 +95,6 @@ Bot Telegram Email Sementara (Temp Mail) berarsitektur modular yang dibangun men
 3. Ubah hak akses bot menjadi **Administrator** (minimal izin *Invite Users via Link*).
 4. Masukkan username channel (contoh `@username_channel_owner`) ke `FORCE_JOIN_CHANNEL` di `.env`.
 5. Masukkan URL invite channel (contoh `https://t.me/username_channel_owner`) ke `FORCE_JOIN_URL` di `.env`.
-
----
-
-## 🌐 MENYESUAIKAN API `temp.yaoi.web.id`
-
-Karena detail REST API `temp.yaoi.web.id` dapat disesuaikan dengan infrastruktur server Anda, bot ini menggunakan **abstraksi provider** (`MailProvider.js` & `YaoiProvider.js`).
-
-### Langkah Menyesuaikan Endpoint Asli:
-
-1. Buka browser dan buka `https://temp.yaoi.web.id/`.
-2. Buka **Developer Tools** (F12) -> pilih tab **Network**.
-3. Lakukan pembuatan email atau reload inbox pada web `temp.yaoi.web.id`.
-4. Perhatikan URL Endpoint API yang dipanggil (misal: `POST /api/v1/mailbox`, `GET /api/v1/messages?email=...`).
-5. Buka file [src/config/constants.js](file:///root/temp-bot/src/config/constants.js) dan update konstanta `YAOI_ENDPOINTS`:
-
-```js
-YAOI_ENDPOINTS: {
-  CREATE_MAILBOX: '/v1/mailbox',
-  LIST_MESSAGES: '/v1/mailbox/:ref/messages',
-  GET_MESSAGE: '/v1/messages/:id',
-  DELETE_MAILBOX: '/v1/mailbox/:ref',
-  HEALTH_CHECK: '/health',
-}
-```
-
-6. Jika API membutuhkan token rahasia, isi `MAIL_API_KEY` di file `.env`.
-7. Jika Anda ingin melakukan pengujian secara offline tanpa API asli, ubah `MAIL_PROVIDER=mock` di file `.env`.
 
 ---
 

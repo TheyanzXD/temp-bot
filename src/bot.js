@@ -22,6 +22,8 @@ const historyHandler = require('./handlers/history.handler');
 const profileHandler = require('./handlers/profile.handler');
 const helpHandler = require('./handlers/help.handler');
 const adminHandler = require('./handlers/admin.handler');
+const downloaderHandler = require('./handlers/downloader.handler');
+const serverHandler = require('./handlers/server.handler');
 const callbackQueryHandler = require('./handlers/callbacks.handler');
 
 function createBot() {
@@ -52,7 +54,16 @@ function createBot() {
   bot.command('history', (ctx) => historyHandler(ctx, 1));
   bot.command('profile', profileHandler);
   bot.command('help', helpHandler);
+  bot.command('server', serverHandler);
   bot.command('admin', (ctx) => adminHandler.handleMainDashboard(ctx));
+
+  // Downloader commands
+  bot.command('ig', (ctx) => downloaderHandler.handleInstagram(ctx));
+  bot.command('terabox', (ctx) => downloaderHandler.handleTerabox(ctx));
+  bot.command('tb', (ctx) => downloaderHandler.handleTeraboxAlt(ctx));
+  bot.command('yt', (ctx) => downloaderHandler.handleYoutube(ctx));
+  bot.command('twitter', (ctx) => downloaderHandler.handleTwitter(ctx));
+  bot.command('x', (ctx) => downloaderHandler.handleTwitter(ctx));
 
   // Text message handlers for prompt steps (custom email & broadcast)
   bot.on('message:text', async (ctx, next) => {

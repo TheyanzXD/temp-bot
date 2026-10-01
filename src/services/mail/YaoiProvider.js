@@ -1,5 +1,5 @@
 /**
- * Implementation of MailProvider for temp.yaoi.web.id
+ * Implementation of MailProvider for temp.yaoi.web.id API v1.
  */
 const { request } = require('undici');
 const MailProvider = require('./MailProvider');
@@ -59,16 +59,31 @@ class YaoiProvider extends MailProvider {
     return null;
   }
 
-  async createMailbox({ localPart, password }) {
+  /**
+   * Helper to parse date string or timestamp into epoch seconds
+   */
+  _parseEpoch(val) {
+    if (!val) return nowSeconds();
+    if (typeof val === 'number') {
+      return val > 1e11 ? Math.floor(val / 1000) : val;
+    }
+    const parsed = Date.parse(val);
+    return isNaN(parsed) ? nowSeconds() : Math.floor(parsed / 1000);
+  }
+
+  async createMailbox({ localPart }) {
     const address = `${localPart}@${this.domain}`;
-    // Attempt API creation if endpoint exists, otherwise fallback gracefully
     let providerRef = localPart;
+
     try {
       const resp = await this._fetch(YAOI_ENDPOINTS.CREATE_MAILBOX, {
         method: 'POST',
-        body: { local_part: localPart, domain: this.domain, password },
+        body: { username: localPart, domain: this.domain, lifetimeMinutes: config.emailTtlMinutes || 60 },
       });
-      if (resp && (resp.id || resp.ref)) {
+
+      if (resp && resp.data && resp.data.id) {
+        providerRef = resp.data.id;
+      } else if (resp && (resp.id || resp.ref)) {
         providerRef = resp.id || resp.ref;
       }
     } catch (err) {
@@ -82,44 +97,56 @@ class YaoiProvider extends MailProvider {
     };
   }
 
-  async listMessages({ address, providerRef }) {
-    const localPart = address.split('@')[0];
-    const endpoint = YAOI_ENDPOINTS.LIST_MESSAGES.replace(':ref', providerRef || localPart);
+  async listMessages({ address }) {
+    const endpoint = YAOI_ENDPOINTS.LIST_MESSAGES.replace(':address', encodeURIComponent(address));
     
     let rawMessages = [];
     try {
       const resp = await this._fetch(endpoint);
-      if (Array.isArray(resp)) {
-        rawMessages = resp;
+      if (resp && resp.data && Array.isArray(resp.data.messages)) {
+        rawMessages = resp.data.messages;
       } else if (resp && Array.isArray(resp.data)) {
         rawMessages = resp.data;
       } else if (resp && Array.isArray(resp.messages)) {
         rawMessages = resp.messages;
-      } else if (resp && Array.isArray(resp.mails)) {
-        rawMessages = resp.mails;
+      } else if (Array.isArray(resp)) {
+        rawMessages = resp;
       }
     } catch (err) {
       logger.error({ err: err.message, address }, 'Failed to list messages from YaoiProvider');
       return [];
     }
 
-    // Standardize array response
-    return rawMessages.map((m) => ({
-      id: String(m.id || m.message_id || m.mail_id || Math.random().toString(36).substring(2)),
-      fromAddress: m.from_address || m.from || 'unknown@domain.com',
-      fromName: m.from_name || m.sender_name || '',
-      toAddress: address,
-      subject: m.subject || '(Tanpa Subjek)',
-      snippet: m.snippet || m.intro || (m.text ? m.text.substring(0, 100) : ''),
-      receivedAt: m.timestamp || m.created_at || nowSeconds(),
-    }));
+    return rawMessages.map((m) => {
+      const fromAddr = m.from ? (m.from.address || m.from) : (m.from_address || 'unknown@domain.com');
+      const fromNm = m.from ? (m.from.name || '') : (m.from_name || '');
+      const rAt = this._parseEpoch(m.receivedAt || m.timestamp || m.created_at);
+
+      return {
+        id: String(m.id || m.message_id || Math.random().toString(36).substring(2)),
+        fromAddress: fromAddr,
+        fromName: fromNm,
+        toAddress: address,
+        subject: m.subject || '(Tanpa Subjek)',
+        snippet: m.preview || m.snippet || m.intro || (m.text ? m.text.substring(0, 100) : ''),
+        receivedAt: rAt,
+      };
+    });
   }
 
-  async getMessage({ address, providerRef, id }) {
-    const endpoint = YAOI_ENDPOINTS.GET_MESSAGE.replace(':id', id);
+  async getMessage({ address, id }) {
+    const endpoint = YAOI_ENDPOINTS.GET_MESSAGE
+      .replace(':address', encodeURIComponent(address))
+      .replace(':id', encodeURIComponent(id));
+
     let m = null;
     try {
-      m = await this._fetch(endpoint);
+      const resp = await this._fetch(endpoint);
+      if (resp && resp.data) {
+        m = resp.data;
+      } else {
+        m = resp;
+      }
     } catch (err) {
       logger.error({ err: err.message, id }, 'Failed to fetch detailed message from YaoiProvider');
     }
@@ -139,23 +166,26 @@ class YaoiProvider extends MailProvider {
       };
     }
 
+    const fromAddr = m.from ? (m.from.address || m.from) : (m.from_address || 'unknown@domain.com');
+    const fromNm = m.from ? (m.from.name || '') : (m.from_name || '');
+    const rAt = this._parseEpoch(m.receivedAt || m.timestamp || m.created_at);
+
     return {
       id: String(m.id || id),
-      fromAddress: m.from_address || m.from || 'unknown@domain.com',
-      fromName: m.from_name || '',
+      fromAddress: fromAddr,
+      fromName: fromNm,
       toAddress: address,
       subject: m.subject || '(Tanpa Subjek)',
-      bodyText: m.body_text || m.text || m.content || '',
-      bodyHtml: m.body_html || m.html || '',
-      snippet: m.snippet || '',
+      bodyText: m.textBody || m.preview || m.body_text || m.text || m.content || '',
+      bodyHtml: m.htmlBody || m.sanitizedHtml || m.body_html || m.html || '',
+      snippet: m.preview || m.snippet || '',
       attachments: Array.isArray(m.attachments) ? m.attachments : [],
-      receivedAt: m.timestamp || m.created_at || nowSeconds(),
+      receivedAt: rAt,
     };
   }
 
-  async deleteMailbox({ address, providerRef }) {
-    const localPart = address.split('@')[0];
-    const endpoint = YAOI_ENDPOINTS.DELETE_MAILBOX.replace(':ref', providerRef || localPart);
+  async deleteMailbox({ address }) {
+    const endpoint = YAOI_ENDPOINTS.DELETE_MAILBOX.replace(':address', encodeURIComponent(address));
     try {
       await this._fetch(endpoint, { method: 'DELETE' });
       return true;
@@ -167,7 +197,7 @@ class YaoiProvider extends MailProvider {
   async healthCheck() {
     try {
       const resp = await this._fetch(YAOI_ENDPOINTS.HEALTH_CHECK);
-      return resp ? true : false;
+      return resp && resp.ok ? true : false;
     } catch (e) {
       return false;
     }

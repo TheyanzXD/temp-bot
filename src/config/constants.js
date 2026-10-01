@@ -32,12 +32,12 @@ module.exports = {
   PAGE_SIZE_MESSAGES: 5,
   PAGE_SIZE_USERS: 8,
 
-  // Endpoint constants for temp.yaoi.web.id API (SESUAIKAN DENGAN API ASLI BILA ADA)
+  // Endpoint constants for temp.yaoi.web.id API v1
   YAOI_ENDPOINTS: {
-    CREATE_MAILBOX: '/mailbox',      // POST
-    LIST_MESSAGES: '/mailbox/:ref/messages', // GET
-    GET_MESSAGE: '/messages/:id',    // GET
-    DELETE_MAILBOX: '/mailbox/:ref', // DELETE
-    HEALTH_CHECK: '/health',         // GET
+    CREATE_MAILBOX: '/mailbox',                     // POST /api/v1/mailbox
+    LIST_MESSAGES: '/mailbox/:address/messages',    // GET /api/v1/mailbox/:address/messages
+    GET_MESSAGE: '/mailbox/:address/messages/:id', // GET /api/v1/mailbox/:address/messages/:id
+    DELETE_MAILBOX: '/mailbox/:address',           // DELETE /api/v1/mailbox/:address
+    HEALTH_CHECK: '/health',                       // GET /api/health
   },
 };

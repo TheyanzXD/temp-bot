@@ -235,9 +235,6 @@ module.exports = {
       `/server - Status server, RAM, CPU & sistem\n` +
       `/help - Bantuan ini\n\n` +
       `<b>Perintah Media Downloader:</b>\n` +
-      `/ig &lt;url&gt; - Downloader Instagram Photo/Video/Reels (Multi-Server V1/V2/V3/V4 FastDL)\n` +
-      `/yt &lt;url&gt; - Downloader YouTube Video & Audio (YtUltra)\n` +
-      `/terabox &lt;url&gt; atau /tb &lt;url&gt; - Downloader & Streamer Terabox\n` +
       `/twitter &lt;url&gt; atau /x &lt;url&gt; - Downloader Video Twitter / X\n\n` +
       `<b>Domain Resmi:</b> <code>@yaoi.web.id</code>`
     );

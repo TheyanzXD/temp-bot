@@ -1,4 +1,4 @@
-# 📧 BOT TELEGRAM TEMP MAIL `@yaoi.web.id` & MEDIA DOWNLOADER SUITE
+# 📧 BOT TELEGRAM TEMP MAIL `@yaoi.web.id` & MEDIA DOWNLOADER
 
 Bot Telegram Email Sementara (Temp Mail) dan Media Downloader berarsitektur modular yang dibangun menggunakan **Node.js**, **grammY framework**, dan **SQLite** (`better-sqlite3` dengan WAL mode enabled). Semua email yang digenerate **WAJIB berakhiran `@yaoi.web.id`**.
 
@@ -13,12 +13,7 @@ Bot Telegram Email Sementara (Temp Mail) dan Media Downloader berarsitektur modu
 - **OTP Auto Detector**: Deteksi otomatis kode verifikasi / OTP dengan tombol salin instan.
 - **Manajemen Email & Inbox**: Riwayat email, baca isi pesan, dan hapus email.
 
-### 2. 📥 Multi-Platform Media Downloader
-- **🔴 YouTube Downloader (`/yt`)**: Mendukung pengunduhan video & audio (MP3/M4A/MP4) resolusi HD melalui API YtUltra.
-- **📦 Terabox Downloader (`/terabox` & `/tb`)**:
-  - `/terabox`: Ekstraksi direct download link HD & stream video langsung menggunakan MD5 Token Generator API PlayTerabox.
-  - `/tb`: Downloader & Streamer Terabox alternatif menggunakan Teraplayer API.
-- **📸 Instagram Downloader (`/ig`)**: Mendukung unduh video Reel/Post dengan sistem selector Multi-Server (Server V1, V2, & V3).
+### 2. 📥 Media Downloader
 - **🐤 Twitter / X Downloader (`/twitter` / `/x`)**: Extract & direct download video postingan X/Twitter.
 
 ### 3. 🖥 System & Server Monitoring (`/server`)
@@ -38,10 +33,6 @@ Bot Telegram Email Sementara (Temp Mail) dan Media Downloader berarsitektur modu
 | `/live` | Temp Mail | Mode live streaming inbox 5 detik |
 | `/history` | Temp Mail | Riwayat daftar email sementara |
 | `/profile` | User | Detail statistik & profil pengguna |
-| `/yt <url>` | Downloader | Download Video & Audio YouTube (YtUltra) |
-| `/terabox <url>` | Downloader | Download & Stream Terabox (PlayTerabox API) |
-| `/tb <url>` | Downloader | Download & Stream Terabox (Teraplayer API) |
-| `/ig <url>` | Downloader | Download Video Instagram (Multi-Server V1/V2/V3) |
 | `/twitter <url>` | Downloader | Download Video Twitter / X |
 | `/x <url>` | Downloader | Alias untuk downloader Twitter |
 | `/server` | System | Cek RAM, Memory, CPU, OS, Logs & Task Status |

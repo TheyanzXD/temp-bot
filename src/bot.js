@@ -58,10 +58,6 @@ function createBot() {
   bot.command('admin', (ctx) => adminHandler.handleMainDashboard(ctx));
 
   // Downloader commands
-  bot.command('ig', (ctx) => downloaderHandler.handleInstagram(ctx));
-  bot.command('terabox', (ctx) => downloaderHandler.handleTerabox(ctx));
-  bot.command('tb', (ctx) => downloaderHandler.handleTeraboxAlt(ctx));
-  bot.command('yt', (ctx) => downloaderHandler.handleYoutube(ctx));
   bot.command('twitter', (ctx) => downloaderHandler.handleTwitter(ctx));
   bot.command('x', (ctx) => downloaderHandler.handleTwitter(ctx));
 

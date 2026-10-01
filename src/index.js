@@ -1,4 +1,18 @@
 /**
+ * Polyfill globalThis.File for environments (Node 18/Docker) where undici/cheerio requires File
+ */
+if (typeof globalThis.File === 'undefined') {
+  const { Blob, File } = require('node:buffer');
+  globalThis.File = File || class File extends Blob {
+    constructor(sources, name, options = {}) {
+      super(sources, options);
+      this.name = name;
+      this.lastModified = options.lastModified || Date.now();
+    }
+  };
+}
+
+/**
  * Application Entry Point.
  */
 const { createBot } = require('./bot');

@@ -1,3 +1,14 @@
+if (typeof globalThis.File === 'undefined') {
+  const { Blob, File } = require('node:buffer');
+  globalThis.File = File || class File extends Blob {
+    constructor(sources, name, options = {}) {
+      super(sources, options);
+      this.name = name;
+      this.lastModified = options.lastModified || Date.now();
+    }
+  };
+}
+
 const axios = require('axios');
 const crypto = require('crypto');
 const cheerio = require('cheerio');

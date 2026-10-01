@@ -12,6 +12,160 @@ if (typeof globalThis.File === 'undefined') {
 const axios = require('axios');
 const crypto = require('crypto');
 const cheerio = require('cheerio');
+const { addExtra } = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteer = addExtra(require('puppeteer'));
+puppeteer.use(StealthPlugin());
+
+const TARGET_SITE = 'https://fastdl.app';
+
+class FastDlDirectBot {
+  async downloadInstagram(instagramUrl) {
+    let browser = null;
+    try {
+      browser = await puppeteer.launch({
+        executablePath: puppeteer.executablePath(),
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ]
+      });
+
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1366, height: 768 });
+
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        window.chrome = { runtime: {} };
+        Object.defineProperty(navigator, 'languages', { get: () => ['id-ID', 'id', 'en-US', 'en'] });
+        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      });
+
+      await page.goto(TARGET_SITE, { waitUntil: 'networkidle2', timeout: 35000 });
+      await new Promise(r => setTimeout(r, 1500));
+
+      let apiResponse = null;
+      let apiResponseRaw = null;
+
+      page.on('response', async (response) => {
+        const url = response.url();
+        if (url.includes('/api/convert')) {
+          try {
+            apiResponseRaw = await response.text();
+            try {
+              apiResponse = JSON.parse(apiResponseRaw);
+            } catch (e) {
+              const jsonMatch = apiResponseRaw.match(/\{[\s\S]*\}/);
+              if (jsonMatch) apiResponse = JSON.parse(jsonMatch[0]);
+            }
+          } catch (e) {
+            // ignore parse error
+          }
+        }
+      });
+
+      const inputFound = await page.evaluate((url) => {
+        const selectors = [
+          'input[type="text"]', 'input[type="url"]',
+          'input[name="url"]', 'input[placeholder*="URL"]',
+          'input[placeholder*="url"]', 'input[placeholder*="link"]',
+          '#url-input', '#url', '.url-input', 'form input'
+        ];
+        let input = null;
+        for (const sel of selectors) {
+          input = document.querySelector(sel);
+          if (input) break;
+        }
+        if (!input) return false;
+
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        ).set;
+
+        nativeInputValueSetter.call(input, url);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+        return true;
+      }, instagramUrl);
+
+      if (!inputFound) throw new Error('Input URL tidak ditemukan.');
+
+      await new Promise(r => setTimeout(r, 1000));
+
+      const btnClicked = await page.evaluate(() => {
+        const selectors = [
+          'button[type="submit"]', 'button.btn',
+          '.download-btn', '.btn-download', 'form button',
+          '[class*="download"]', '[class*="submit"]', '[class*="convert"]'
+        ];
+        for (const sel of selectors) {
+          const btns = document.querySelectorAll(sel);
+          for (const btn of btns) {
+            if (btn.offsetParent !== null && btn.textContent.trim().length > 0) {
+              btn.click();
+              return btn.textContent.trim().substring(0, 30);
+            }
+          }
+        }
+        const form = document.querySelector('form');
+        if (form) {
+          form.dispatchEvent(new Event('submit', { bubbles: true }));
+          return 'form_submit';
+        }
+        return null;
+      });
+
+      if (!btnClicked) throw new Error('Tombol download tidak ditemukan.');
+
+      let waitTime = 0;
+      const maxWait = 35000;
+      while (!apiResponse && waitTime < maxWait) {
+        await new Promise(r => setTimeout(r, 500));
+        waitTime += 500;
+      }
+
+      if (!apiResponse) throw new Error('Respons API FastDL timeout.');
+
+      let data = apiResponse;
+      if (data?.url && Array.isArray(data.url) && data.url.length > 0) {
+        const bestMedia = data.url.reduce((prev, curr) =>
+          ((curr.quality || 0) > (prev.quality || 0)) ? curr : prev
+        );
+
+        return {
+          status: true,
+          mediaUrl: bestMedia.url,
+          isVideo: (bestMedia.type || bestMedia.ext || '').includes('mp4') || bestMedia.ext === 'mp4',
+          title: data.meta?.title || 'Instagram Post',
+          username: data.meta?.username || 'unknown',
+          thumbnail: data.meta?.thumbnail || null,
+        };
+      }
+
+      throw new Error('FastDL tidak mengembalikan link media.');
+    } finally {
+      if (browser) await browser.close().catch(() => null);
+    }
+  }
+}
+
+/**
+ * Clean Instagram URL helper
+ */
+function cleanInstagramUrl(url) {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch (e) {
+    return url.split('?')[0];
+  }
+}
 
 /**
  * Generate Token for Terabox API
@@ -129,30 +283,92 @@ async function extractTwitterVideo(twitterUrl) {
 }
 
 /**
- * Instagram Download APIs
+ * Instagram V1 (Deline API with Image/Video support)
  */
-async function fetchInstagramV1(link) {
+async function fetchInstagramV1(rawLink) {
+  const link = cleanInstagramUrl(rawLink);
   const res = await axios.get(`https://api.deline.web.id/downloader/ig?url=${encodeURIComponent(link)}`, { timeout: 30000 });
-  const videoUrl = res.data?.result?.media?.videos?.[0] || res.data?.result?.videos?.[0];
-  if (!videoUrl) throw new Error("Gagal mendapatkan URL video dari API V1.");
-  return { videoUrl };
+  const media = res.data?.result?.media || res.data?.result;
+  
+  let mediaUrl = null;
+  let isVideo = false;
+
+  if (media) {
+    if (Array.isArray(media.videos) && media.videos.length > 0) {
+      mediaUrl = media.videos[0];
+      isVideo = true;
+    } else if (Array.isArray(media.images) && media.images.length > 0) {
+      mediaUrl = media.images[0];
+      isVideo = false;
+    } else if (typeof media.url === 'string') {
+      mediaUrl = media.url;
+      isVideo = mediaUrl.includes('.mp4');
+    } else if (Array.isArray(media) && media.length > 0) {
+      mediaUrl = media[0]?.url || media[0];
+      isVideo = typeof mediaUrl === 'string' && mediaUrl.includes('.mp4');
+    }
+  }
+
+  if (!mediaUrl || typeof mediaUrl !== 'string') {
+    throw new Error("Gagal mendapatkan URL media dari API V1.");
+  }
+
+  return { videoUrl: mediaUrl, mediaUrl, isVideo };
 }
 
-async function fetchInstagramV2(link) {
+/**
+ * Instagram V2 (Ikyyxd API)
+ */
+async function fetchInstagramV2(rawLink) {
+  const link = cleanInstagramUrl(rawLink);
   const res = await axios.get(`https://api.ikyyxd.my.id/download/igv2?url=${encodeURIComponent(link)}`, { timeout: 30000 });
-  const videoUrl = res.data?.result?.[0]?.url;
-  if (!videoUrl) throw new Error("Gagal mendapatkan URL video dari API V2.");
-  return { videoUrl };
+  const result = res.data?.result;
+  const mediaUrl = Array.isArray(result) ? (result[0]?.url || result[0]) : (result?.url || result);
+  
+  if (!mediaUrl || typeof mediaUrl !== 'string') {
+    throw new Error("Gagal mendapatkan URL media dari API V2.");
+  }
+  
+  const isVideo = mediaUrl.includes('.mp4');
+  return { videoUrl: mediaUrl, mediaUrl, isVideo };
 }
 
-async function fetchInstagramV3(link) {
+/**
+ * Instagram V3 (Zenzxz / Backup API)
+ */
+async function fetchInstagramV3(rawLink) {
+  const link = cleanInstagramUrl(rawLink);
   const res = await axios.get(`https://api.zenzxz.my.id/download/instagram?url=${encodeURIComponent(link)}`, { timeout: 30000 });
   const data = res.data?.result;
-  if (!data || !data.url) throw new Error("Gagal mendapatkan URL video dari API V3.");
+  const mediaUrl = data?.url || (Array.isArray(data) ? data[0]?.url : null);
+  
+  if (!mediaUrl || typeof mediaUrl !== 'string') {
+    throw new Error("Gagal mendapatkan URL media dari API V3.");
+  }
+  
   return {
-    videoUrl: data.url,
-    username: data.username,
-    caption: data.caption
+    videoUrl: mediaUrl,
+    mediaUrl,
+    username: data?.username,
+    caption: data?.caption,
+    isVideo: mediaUrl.includes('.mp4')
+  };
+}
+
+/**
+ * Instagram V4 (FastDL Stealth Scraper)
+ */
+async function fetchInstagramFastDL(rawLink) {
+  const link = cleanInstagramUrl(rawLink);
+  const fastdl = new FastDlDirectBot();
+  const res = await fastdl.downloadInstagram(link);
+  return {
+    videoUrl: res.mediaUrl,
+    mediaUrl: res.mediaUrl,
+    isVideo: res.isVideo,
+    username: res.username,
+    title: res.title,
+    thumbnail: res.thumbnail
   };
 }
 
@@ -235,11 +451,13 @@ async function teraplayerDownloader(url) {
 }
 
 module.exports = {
+  cleanInstagramUrl,
   fetchPlayTerabox,
   extractTwitterVideo,
   fetchInstagramV1,
   fetchInstagramV2,
   fetchInstagramV3,
+  fetchInstagramFastDL,
   youtubeDownloader,
   teraplayerDownloader,
 };

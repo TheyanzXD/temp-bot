@@ -6,6 +6,7 @@ const {
   fetchInstagramV1,
   fetchInstagramV2,
   fetchInstagramV3,
+  fetchInstagramFastDL,
   youtubeDownloader,
   teraplayerDownloader,
 } = require('../services/downloader.service');
@@ -13,6 +14,123 @@ const escapeHtml = require('../utils/escape-html');
 const logger = require('../utils/logger');
 
 const igCache = new Map();
+
+/**
+ * /ig command handler
+ */
+async function handleInstagram(ctx) {
+  const link = (ctx.match || '').trim() || ctx.message?.text?.split(' ').slice(1).join(' ').trim();
+  if (!link || !link.includes('instagram.com')) {
+    return ctx.reply('⚠️ Kirim link Instagram yang valid!\n\n<b>Contoh:</b> <code>/ig https://www.instagram.com/reel/...</code>', {
+      parse_mode: 'HTML',
+    });
+  }
+
+  const userId = ctx.from.id;
+  igCache.set(userId, link);
+
+  await ctx.reply('<blockquote>📥 <b>INSTAGRAM DOWNLOADER</b></blockquote>\nPilih server:', {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'V1', callback_data: 'ig_v1' }, { text: 'V2', callback_data: 'ig_v2' }],
+        [{ text: 'V3', callback_data: 'ig_v3' }, { text: 'V4 (FastDL)', callback_data: 'ig_v4' }],
+      ],
+    },
+  });
+}
+
+/**
+ * Instagram Callback Action Handler (ig_v1, ig_v2, ig_v3, ig_v4)
+ */
+async function handleInstagramCallback(ctx) {
+  const server = ctx.callbackQuery.data; // ig_v1, ig_v2, ig_v3, ig_v4
+  const userId = ctx.from.id;
+  const link = igCache.get(userId);
+
+  if (!link) {
+    return ctx.answerCallbackQuery({ text: '❌ Link hilang, kirim ulang /ig', show_alert: true });
+  }
+
+  await ctx.answerCallbackQuery({ text: '📥 Sedang Mengunduh...' });
+
+  try {
+    await ctx.editMessageText(`⏳ <b>${server.toUpperCase()}</b> sedang memproses media Instagram...`, {
+      parse_mode: 'HTML',
+    }).catch(() => null);
+
+    let mediaUrl = '';
+    let isVideo = true;
+    let caption = '🎬 <b>I N S T A G R A M</b>';
+
+    if (server === 'ig_v1') {
+      const res = await fetchInstagramV1(link);
+      mediaUrl = res.mediaUrl;
+      isVideo = res.isVideo;
+    } else if (server === 'ig_v2') {
+      const res = await fetchInstagramV2(link);
+      mediaUrl = res.mediaUrl;
+      isVideo = res.isVideo;
+    } else if (server === 'ig_v3') {
+      const res = await fetchInstagramV3(link);
+      mediaUrl = res.mediaUrl;
+      isVideo = res.isVideo;
+      if (res.username) {
+        const cleanCaption = res.caption ? escapeHtml(res.caption) : '-';
+        caption += `\n\n👤 <b>User</b>: ${escapeHtml(res.username)}\n📝 <b>Caption</b>: ${cleanCaption}`;
+      }
+    } else if (server === 'ig_v4') {
+      const res = await fetchInstagramFastDL(link);
+      mediaUrl = res.mediaUrl;
+      isVideo = res.isVideo;
+      if (res.username) {
+        caption += `\n\n👤 <b>User</b>: ${escapeHtml(res.username)}`;
+      }
+    }
+
+    if (!mediaUrl) throw new Error('Gagal mendapatkan URL media dari API.');
+
+    await ctx.editMessageText(`🚀 Sedang mengunduh file media...`, { parse_mode: 'HTML' }).catch(() => null);
+
+    const bufferRes = await axios.get(mediaUrl, {
+      responseType: 'arraybuffer',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
+      },
+      timeout: 60000,
+    });
+
+    const replyMsgId = ctx.callbackQuery.message?.reply_to_message?.message_id;
+
+    if (isVideo) {
+      await ctx.replyWithVideo(new InputFile(Buffer.from(bufferRes.data), 'instagram.mp4'), {
+        caption: caption,
+        parse_mode: 'HTML',
+        reply_parameters: replyMsgId ? { message_id: replyMsgId } : undefined,
+      });
+    } else {
+      await ctx.replyWithPhoto(new InputFile(Buffer.from(bufferRes.data), 'instagram.jpg'), {
+        caption: caption,
+        parse_mode: 'HTML',
+        reply_parameters: replyMsgId ? { message_id: replyMsgId } : undefined,
+      });
+    }
+
+    await ctx.deleteMessage().catch(() => null);
+    igCache.delete(userId);
+  } catch (err) {
+    logger.error(`[${server}] ERROR: ${err.message}`);
+    await ctx.editMessageText(`❌ <b>${server.toUpperCase()} Gagal!</b>\nAlasan: ${escapeHtml(err.message)}\nCoba server lain, jir.`, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba V1', callback_data: 'ig_v1' }, { text: '🔄 Coba V2', callback_data: 'ig_v2' }],
+          [{ text: '🔄 Coba V3', callback_data: 'ig_v3' }, { text: '⚡ Coba V4 (FastDL)', callback_data: 'ig_v4' }],
+        ],
+      },
+    }).catch(() => null);
+  }
+}
 
 /**
  * /yt command handler
@@ -83,7 +201,6 @@ async function handleTeraboxAlt(ctx) {
   try {
     let res = await teraplayerDownloader(link);
     if (!res.status || !res.files || res.files.length === 0) {
-      // Fallback to fetchPlayTerabox
       res = await fetchPlayTerabox(link);
     }
 
@@ -121,104 +238,6 @@ async function handleTeraboxAlt(ctx) {
     logger.error(`[TeraboxAlt] ERROR: ${err.message}`);
     await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ <b>Terabox Error!</b>\nAlasan: ${escapeHtml(err.message)}`, {
       parse_mode: 'HTML',
-    }).catch(() => null);
-  }
-}
-
-/**
- * /ig command handler
- */
-async function handleInstagram(ctx) {
-  const link = (ctx.match || '').trim() || ctx.message?.text?.split(' ').slice(1).join(' ').trim();
-  if (!link || !link.includes('instagram.com')) {
-    return ctx.reply('⚠️ Kirim link Instagram yang valid!\n\n<b>Contoh:</b> <code>/ig https://www.instagram.com/reel/...</code>', {
-      parse_mode: 'HTML',
-    });
-  }
-
-  const userId = ctx.from.id;
-  igCache.set(userId, link);
-
-  await ctx.reply('<blockquote>📥 <b>INSTAGRAM DOWNLOADER</b></blockquote>\nPilih server:', {
-    parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'V1', callback_data: 'ig_v1' }, { text: 'V2', callback_data: 'ig_v2' }],
-        [{ text: 'V3', callback_data: 'ig_v3' }],
-      ],
-    },
-  });
-}
-
-/**
- * Instagram Callback Action Handler (ig_v1, ig_v2, ig_v3)
- */
-async function handleInstagramCallback(ctx) {
-  const server = ctx.callbackQuery.data; // ig_v1, ig_v2, ig_v3
-  const userId = ctx.from.id;
-  const link = igCache.get(userId);
-
-  if (!link) {
-    return ctx.answerCallbackQuery({ text: '❌ Link hilang, kirim ulang /ig', show_alert: true });
-  }
-
-  await ctx.answerCallbackQuery({ text: '📥 Sedang Mengunduh...' });
-
-  try {
-    await ctx.editMessageText(`⏳ <b>${server.toUpperCase()}</b> sedang memproses video...`, {
-      parse_mode: 'HTML',
-    }).catch(() => null);
-
-    let videoUrl = '';
-    let caption = '🎬 <b>I N S T A G R A M</b>';
-
-    if (server === 'ig_v1') {
-      const res = await fetchInstagramV1(link);
-      videoUrl = res.videoUrl;
-    } else if (server === 'ig_v2') {
-      const res = await fetchInstagramV2(link);
-      videoUrl = res.videoUrl;
-    } else if (server === 'ig_v3') {
-      const res = await fetchInstagramV3(link);
-      videoUrl = res.videoUrl;
-      if (res.username) {
-        const cleanCaption = res.caption ? escapeHtml(res.caption) : '-';
-        caption += `\n\n👤 <b>User</b>: ${escapeHtml(res.username)}\n📝 <b>Caption</b>: ${cleanCaption}`;
-      }
-    }
-
-    if (!videoUrl) throw new Error('Gagal mendapatkan URL video dari API.');
-
-    await ctx.editMessageText(`🚀 Sedang mendownload video...`, { parse_mode: 'HTML' }).catch(() => null);
-
-    const videoBuffer = await axios.get(videoUrl, {
-      responseType: 'arraybuffer',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-      },
-      timeout: 60000,
-    });
-
-    const replyMsgId = ctx.callbackQuery.message?.reply_to_message?.message_id;
-
-    await ctx.replyWithVideo(new InputFile(Buffer.from(videoBuffer.data), 'instagram.mp4'), {
-      caption: caption,
-      parse_mode: 'HTML',
-      reply_parameters: replyMsgId ? { message_id: replyMsgId } : undefined,
-    });
-
-    await ctx.deleteMessage().catch(() => null);
-    igCache.delete(userId);
-  } catch (err) {
-    logger.error(`[${server}] ERROR: ${err.message}`);
-    await ctx.editMessageText(`❌ <b>${server.toUpperCase()} Gagal!</b>\nAlasan: ${escapeHtml(err.message)}\nCoba server lain, jir.`, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔄 Coba V1', callback_data: 'ig_v1' }, { text: '🔄 Coba V2', callback_data: 'ig_v2' }],
-          [{ text: '🔄 Coba V3', callback_data: 'ig_v3' }],
-        ],
-      },
     }).catch(() => null);
   }
 }
@@ -315,7 +334,6 @@ async function handleTwitter(ctx) {
     await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => null);
 
     if (bestVideo && bestVideo.link) {
-      // Try sending video directly first
       try {
         const videoBuffer = await axios.get(bestVideo.link, {
           responseType: 'arraybuffer',

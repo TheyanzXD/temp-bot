@@ -27,6 +27,9 @@
     "mailparser": "^3.6.8",
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
+    "puppeteer": "^22.15.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "sanitize-html": "^2.13.0",
     "undici": "^6.8.0"
   },
